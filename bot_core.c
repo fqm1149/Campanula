@@ -26,13 +26,19 @@ char bot_name[20] = "Campanula v0.1";
 
 //Bot Core Func Claim
 int bot_operate();
+extern void printIntMap(int** map, int line, int column, char* title);
+extern int** GetInDisToBorder(Block** mapL1, int line, int column, int playernum);
+extern int** GetInDisToEnemy(Block** mapL1, int line, int column, int playernum);
+extern int** GetInDisToHome(Block** mapL1, int line, int column, int playernum);
+extern int** GetExDisToBorder(Block** mapL1, int line, int column, int playernum);
+extern int** GetDisToCenter(Block** mapL1, int line, int column, int playernum, int x, int y);
 
 //Anti-cheat Func
 int anti_cheat();
 bool islit(int x, int y);
 //Bot Memory Var
 WeighBlock** weightmap;
-
+float** dangermap;
 
 
 //Bot Export Func
@@ -80,10 +86,11 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 			switch (serverCmd) {
 			case SHOW_MAP:
 				for (int i = 0; i < line; i++) {
-					free(mapL1[i]); free(weightmap[i]);
+					free(mapL1[i]); free(weightmap[i]); free(dangermap[i]);
 				}
 				free(mapL1);
 				free(weightmap);
+				free(dangermap);
 				free(mapbuffer);
 				NeedToFreeMap = false;
 				messageType = CLIENT_CMD;
@@ -100,9 +107,11 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 				column = setupdata.mapy;
 				mapL1 = malloc(line * sizeof(Block*));
 				weightmap = malloc(line * sizeof(WeighBlock*));
+				dangermap = malloc(line * sizeof(float*));
 				for (int i = 0; i < line; i++) {
 					mapL1[i] = malloc(column * sizeof(Block));
-					weightmap = malloc(column * sizeof(WeighBlock));
+					weightmap[i] = malloc(column * sizeof(WeighBlock));
+					dangermap[i] = malloc(column * sizeof(float));
 				}
 				mapbuffer = malloc(line * column * sizeof(Block));
 				break;
@@ -154,7 +163,28 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 
 //Bot Core Func
 int bot_operate() {
+	//starting weight
+	for (int i = 0; i < line; i++) memset(weightmap[i], 0, column * sizeof(WeighBlock));
+	//action.expand
+	int** map_i2b = GetInDisToBorder(mapL1, line, column, playernum);
+	int** map_e2b = GetExDisToBorder(mapL1, line, column, playernum);
 
+	//final calculate and decision making
+	for (int i = 0; i < line; i++) {
+		for (int j = 0; j < column; j++) {
+			if (mapL1[i][j].owner == playernum) {
+				weightmap[i][j].startw += (100 - map_i2b[i][j]) * (mapL1[i][j].num + 1);
+			}
+			weightmap[i][j].endw += map_e2b[i][j];
+		}
+	}
+	//clear tmp memory use
+	for (int i = 0; i < line; i++) {
+		free(map_i2b[i]);
+		free(map_e2b[i]);
+	}
+	free(map_i2b);
+	free(map_e2b);
 }
 
 int anti_cheat() {
