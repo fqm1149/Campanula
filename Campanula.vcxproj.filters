@@ -18,9 +18,15 @@
     <ClCompile Include="bot_core.c">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="weight.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\GUI\alpha\basicmap\generals.h">
+      <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="campanula.h">
       <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>

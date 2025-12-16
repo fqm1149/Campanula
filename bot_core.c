@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <threads.h>
 #include <stdbool.h>
+#include <campanula.h>
 StatisticData statisticData;
 SetupData setupdata;
 Block** mapL1;
@@ -17,6 +18,8 @@ char messageType, currentCMD;
 char msgType, serverCmd;//接收使用
 bool NeedToFreeMap = false;
 bool islose = false;
+bool NeedToUploadMove = false;
+Move currentMove;
 //Bot Info
 char bot_name[20] = "Campanula v0.1";
 
@@ -24,9 +27,11 @@ char bot_name[20] = "Campanula v0.1";
 //Bot Core Func Claim
 int bot_operate();
 
-
+//Anti-cheat Func
+int anti_cheat();
+bool islit(int x, int y);
 //Bot Memory Var
-
+WeighBlock** weightmap;
 
 
 
@@ -74,8 +79,11 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 			}
 			switch (serverCmd) {
 			case SHOW_MAP:
-				for (int i = 0; i < line; i++) free(mapL1[i]);
+				for (int i = 0; i < line; i++) {
+					free(mapL1[i]); free(weightmap[i]);
+				}
 				free(mapL1);
+				free(weightmap);
 				free(mapbuffer);
 				NeedToFreeMap = false;
 				messageType = CLIENT_CMD;
@@ -91,8 +99,10 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 				line = setupdata.mapx;
 				column = setupdata.mapy;
 				mapL1 = malloc(line * sizeof(Block*));
+				weightmap = malloc(line * sizeof(WeighBlock*));
 				for (int i = 0; i < line; i++) {
 					mapL1[i] = malloc(column * sizeof(Block));
+					weightmap = malloc(column * sizeof(WeighBlock));
 				}
 				mapbuffer = malloc(line * column * sizeof(Block));
 				break;
@@ -123,8 +133,15 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 				send(sock, &messageType, 1, 0);
 				send(sock, &currentCMD, 1, 0);
 				printf("Bot Lose!\n");
+				continue;
 			}
+			anti_cheat();
 			bot_operate();
+			if (NeedToUploadMove) {
+				messageType = UPLOAD_MOVE;
+				send(sock, &messageType, 1, 0);
+				send(sock, &currentMove, sizeof(Move), 0);
+			}
 		}
 	}
 	closesocket(sock);
@@ -138,4 +155,24 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 //Bot Core Func
 int bot_operate() {
 
+}
+
+int anti_cheat() {
+	for (int i = 0; i < line; i++) {
+		for (int j = 0; j < column; j++) {
+			if (!islit(i, j)) {
+				mapL1[i][j].num = OBSTACLE;
+				mapL1[i][j].owner = OBSTACLE;
+				mapL1[i][j].type = (mapL1[i][j].type == PLAIN) ? PLAIN : OBSTACLE;
+			}
+		}
+	}
+}
+
+bool islit(int x, int y) {
+	for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {
+		int tx = x + i, ty = y + j;
+		if (tx >= 0 && tx < line && ty >= 0 && ty < column) if (mapL1[tx][ty].owner == playernum) return true;
+	}
+	return false;
 }
