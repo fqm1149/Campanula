@@ -32,6 +32,13 @@ extern int** GetInDisToEnemy(Block** mapL1, int line, int column, int playernum)
 extern int** GetInDisToHome(Block** mapL1, int line, int column, int playernum);
 extern int** GetExDisToBorder(Block** mapL1, int line, int column, int playernum);
 extern int** GetDisToCenter(Block** mapL1, int line, int column, int playernum, int x, int y);
+extern int PathWeight(path_node* head, Block** mapL1);
+extern path_node* GetPathnode(Vector start, Vector end, Block** mapL1, int line, int column, int playernum);
+extern void FreePathFromTail(path_node* tail);
+extern void FreePathFromHead(path_node* head);
+extern int PathWeight(path_node* head, Block** mapL1);
+
+extern Vector GetMaxWeight(WeighBlock** weightmap, int line, int column, int type_of_weight);
 
 //Anti-cheat Func
 int anti_cheat();
@@ -39,7 +46,8 @@ bool islit(int x, int y);
 //Bot Memory Var
 WeighBlock** weightmap;
 float** dangermap;
-
+Vector botCurrentLoc;
+path_node* currentPath;
 
 //Bot Export Func
 __declspec(dllexport) int bot_function(BotData* botdata) {
@@ -150,6 +158,7 @@ __declspec(dllexport) int bot_function(BotData* botdata) {
 				messageType = UPLOAD_MOVE;
 				send(sock, &messageType, 1, 0);
 				send(sock, &currentMove, sizeof(Move), 0);
+				NeedToUploadMove = false;
 			}
 		}
 	}
@@ -173,11 +182,46 @@ int bot_operate() {
 	for (int i = 0; i < line; i++) {
 		for (int j = 0; j < column; j++) {
 			if (mapL1[i][j].owner == playernum) {
-				weightmap[i][j].startw += (100 - map_i2b[i][j]) * (mapL1[i][j].num + 1);
+				weightmap[i][j].startw += (100 - map_i2b[i][j]) * mapL1[i][j].num;
 			}
 			weightmap[i][j].endw += map_e2b[i][j];
 		}
 	}
+	Vector tmpstart = GetMaxWeight(weightmap, line, column, 0), tmpend = GetMaxWeight(weightmap, line, column, 1);
+	path_node* tmppath = GetPathnode(tmpstart, tmpend, mapL1, line, column, playernum);
+	if (currentPath == NULL) {
+		currentPath = tmppath;
+	}
+	else {
+		if (currentPath->next == NULL) {
+			FreePathFromTail(currentPath);
+			currentPath = tmppath;
+		}
+		else {
+			int originw = PathWeight(currentPath, mapL1), tmpw = PathWeight(tmppath, mapL1);
+			if (tmpw > 2 * originw) {
+				FreePathFromHead(currentPath->next);
+				FreePathFromTail(currentPath);
+				currentPath = tmppath;
+			}
+			else {
+				FreePathFromHead(tmppath);
+			}
+		}
+		
+	}
+	botCurrentLoc = currentPath->loc;
+	if (mapL1[botCurrentLoc.x][botCurrentLoc.y].num > 1) {
+		currentMove.launcher = playernum;
+		currentMove.startx = botCurrentLoc.x+1;
+		currentMove.starty = botCurrentLoc.y+1;
+		currentPath = currentPath->next;
+		currentMove.endx = currentPath->loc.x+1;
+		currentMove.endy = currentPath->loc.y+1;
+		NeedToUploadMove = true;
+		printf("campanula send move (%d,%d) to (%d %d)\n", currentMove.startx, currentMove.starty, currentMove.endx, currentMove.endy);
+	}
+
 	//clear tmp memory use
 	for (int i = 0; i < line; i++) {
 		free(map_i2b[i]);

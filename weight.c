@@ -182,7 +182,7 @@ int** GetDisToCenter(Block** mapL1, int line, int column, int playernum,int x,in
 	return resmap;
 }
 //返回的是指向path头的地址
-path_node* GetPath(Vector start, Vector end, Block** mapL1, int line, int column, int playernum) {
+path_node* GetPathnode(Vector start, Vector end, Block** mapL1, int line, int column, int playernum) {
 	int** map_d2end = GetDisToCenter(mapL1, line, column, playernum, end.x, end.y);
 	if (map_d2end[start.x][start.y] == 0) {
 		for (int i = 0; i < line; i++)free(map_d2end[i]);
@@ -198,10 +198,10 @@ path_node* GetPath(Vector start, Vector end, Block** mapL1, int line, int column
 	while (map_d2end[ptr->loc.x][ptr->loc.y] > 1) {
 		int i = ptr->loc.x, j = ptr->loc.y;
 		ptr->next = malloc(sizeof(path_node));
-		if (i > 0) if (map_d2end[i - 1][j] < map_d2end[i][j]) ptr->next->loc = (Vector){ i - 1,j };
-		if (i < line - 1)if (map_d2end[i + 1][j] < map_d2end[i][j]) ptr->next->loc = (Vector){ i + 1,j };
-		if (j > 0) if (map_d2end[i][j - 1] < map_d2end[i][j])ptr->next->loc = (Vector){ i,j - 1 };
-		if (j < column - 1) if (map_d2end[i][j + 1] < map_d2end[i][j])ptr->next->loc = (Vector){ i,j + 1 };
+		if (i > 0) if (map_d2end[i - 1][j] < map_d2end[i][j] && map_d2end[i - 1][j] > 0) ptr->next->loc = (Vector){ i - 1,j };
+		if (i < line - 1)if (map_d2end[i + 1][j] < map_d2end[i][j] && map_d2end[i + 1][j] > 0) ptr->next->loc = (Vector){ i + 1,j };
+		if (j > 0) if (map_d2end[i][j - 1] < map_d2end[i][j] && map_d2end[i][j - 1] > 0)ptr->next->loc = (Vector){ i,j - 1 };
+		if (j < column - 1) if (map_d2end[i][j + 1] < map_d2end[i][j] && map_d2end[i][j + 1] > 0)ptr->next->loc = (Vector){ i,j + 1 };
 		ptr->next->remain_cnt = ptr->remain_cnt - 1;
 		ptr->next->next = NULL;
 		ptr->next->previous = ptr;
@@ -212,11 +212,53 @@ path_node* GetPath(Vector start, Vector end, Block** mapL1, int line, int column
 	return head;
 }
 
-void FreePath(path_node* head) {
+void FreePathFromTail(path_node* tail) {
+	path_node* ptr;
+	while (tail != NULL) {
+		ptr = tail->previous;
+		free(tail);
+		tail = ptr;
+	}
+}
+void FreePathFromHead(path_node* head) {
 	path_node* ptr;
 	while (head != NULL) {
 		ptr = head->next;
 		free(head);
 		head = ptr;
 	}
+}
+
+//计算路线权重
+int PathWeight(path_node* head, Block** mapL1) {
+	return (head->remain_cnt-1) * (mapL1[head->loc.x][head->loc.y].num);
+}
+
+//寻找最大值,0:startw,1:endw
+Vector GetMaxWeight(WeighBlock** weightmap, int line, int column, int type_of_weight) {
+	float maxweight = 0;
+	Vector output = { 0,0 };
+	if (type_of_weight == 0) {
+		for (int i = 0; i < line; i++) {
+			for (int j = 0; j < column; j++) {
+				if (weightmap[i][j].startw > maxweight) {
+					maxweight = weightmap[i][j].startw;
+					output.x = i;
+					output.y = j;
+				}
+			}
+		}
+	}
+	if (type_of_weight == 1) {
+		for (int i = 0; i < line; i++) {
+			for (int j = 0; j < column; j++) {
+				if (weightmap[i][j].endw > maxweight) {
+					maxweight = weightmap[i][j].endw;
+					output.x = i;
+					output.y = j;
+				}
+			}
+		}
+	}
+	return output;
 }
